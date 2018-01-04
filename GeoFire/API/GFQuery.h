@@ -36,10 +36,11 @@ typedef NSUInteger FirebaseHandle;
 typedef NS_ENUM(NSUInteger, GFEventType) {
     GFEventTypeKeyEntered,
     GFEventTypeKeyExited,
-    GFEventTypeKeyMoved
+    GFEventTypeKeyMoved,
+    GFEventTypeCustomDataMaybeChanged
 };
 
-typedef void (^GFQueryResultBlock) (NSString *key, CLLocation *location);
+typedef void (^GFQueryResultBlock) (NSString *key, CLLocation *location, id customData);
 typedef void (^GFReadyBlock) (void);
 
 /**
@@ -61,7 +62,8 @@ typedef void (^GFReadyBlock) (void);
      typedef NS_ENUM(NSUInteger, GFEventType) {
        GFEventTypeKeyEntered, // A key entered the search area
        GFEventTypeKeyExited,  // A key exited the search area
-       GFEventTypeKeyMoved    // A key moved within the search area
+       GFEventTypeKeyMoved,   // A key moved within the search area
+       GFEventTypeCustomDataMaybeChanged // A key changed but its location did not, so maybe its custom data changed
      };
 
 

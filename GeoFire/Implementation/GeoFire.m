@@ -14,6 +14,7 @@
 #import "GFQuery+Private.h"
 
 NSString * const kGeoFireErrorDomain = @"com.firebase.geofire";
+NSString * const MSDCustomDataKey = @"msd";
 
 enum {
     GFParseError = 1000
@@ -57,12 +58,21 @@ enum {
              forKey:(NSString *)key
 withCompletionBlock:(GFCompletionBlock)block
 {
+    [self setLocation:location customData:nil forKey:key withCompletionBlock:block];
+}
+
+- (void)setLocation:(CLLocation *)location
+         customData:(id)customData
+             forKey:(NSString *)key
+withCompletionBlock:(GFCompletionBlock)block
+{
     if (!CLLocationCoordinate2DIsValid(location.coordinate)) {
         [NSException raise:NSInvalidArgumentException
                     format:@"Not a valid coordinate: [%f, %f]",
          location.coordinate.latitude, location.coordinate.longitude];
     }
     [self setLocationValue:location
+                customData:customData
                     forKey:key
                  withBlock:block];
 }
@@ -82,16 +92,22 @@ withCompletionBlock:(GFCompletionBlock)block
 }
 
 - (void)setLocationValue:(CLLocation *)location
+              customData:(id)customData
                   forKey:(NSString *)key
                withBlock:(GFCompletionBlock)block
 {
-    NSDictionary *value;
+    NSMutableDictionary *value;
     NSString *priority;
     if (location != nil) {
         NSNumber *lat = [NSNumber numberWithDouble:location.coordinate.latitude];
         NSNumber *lng = [NSNumber numberWithDouble:location.coordinate.longitude];
         NSString *geoHash = [GFGeoHash newWithLocation:location.coordinate].geoHashValue;
-        value = @{ @"l": @[ lat, lng ], @"g": geoHash };
+        value = [NSMutableDictionary new];
+        value[@"l"] = @[ lat, lng ];
+        value[@"g"] = geoHash;
+        if (customData && ![[NSNull null] isEqual:customData]) {
+            value[MSDCustomDataKey] = customData;
+        }
         priority = geoHash;
     } else {
         value = nil;
@@ -115,7 +131,7 @@ withCompletionBlock:(GFCompletionBlock)block
 
 - (void)removeKey:(NSString *)key withCompletionBlock:(GFCompletionBlock)block
 {
-    [self setLocationValue:nil forKey:key withBlock:block];
+    [self setLocationValue:nil customData:nil forKey:key withBlock:block];
 }
 
 + (CLLocation *)locationFromValue:(id)value
@@ -138,6 +154,15 @@ withCompletionBlock:(GFCompletionBlock)block
     return nil;
 }
 
++ (id)customDataFromSnapshot:(FIRDataSnapshot *)snapshot
+{
+    id customData = [snapshot childSnapshotForPath:MSDCustomDataKey].value;
+    if ([[NSNull null] isEqual:customData]) {
+        return nil;
+    }
+    return customData;
+}
+
 - (void)getLocationForKey:(NSString *)key withCallback:(GFCallbackBlock)callback
 {
     [[self firebaseRefForLocationKey:key]
@@ -145,23 +170,24 @@ withCompletionBlock:(GFCompletionBlock)block
      withBlock:^(FIRDataSnapshot *snapshot) {
          dispatch_async(self.callbackQueue, ^{
              if (snapshot.value == nil || [snapshot.value isMemberOfClass:[NSNull class]]) {
-                 callback(nil, nil);
+                 callback(nil, nil, nil);
              } else {
                  CLLocation *location = [GeoFire locationFromValue:snapshot.value];
                  if (location != nil) {
-                     callback(location, nil);
+                     id customData = [snapshot hasChild:MSDCustomDataKey] ? [[snapshot childSnapshotForPath:MSDCustomDataKey] value] : nil;
+                     callback(location, customData, nil);
                  } else {
                      NSMutableDictionary* details = [NSMutableDictionary dictionary];
                      [details setValue:[NSString stringWithFormat:@"Unable to parse location value: %@", snapshot.value]
                                 forKey:NSLocalizedDescriptionKey];
                      NSError *error = [NSError errorWithDomain:kGeoFireErrorDomain code:GFParseError userInfo:details];
-                     callback(nil, error);
+                     callback(nil, nil, error);
                  }
              }
          });
      } withCancelBlock:^(NSError *error) {
          dispatch_async(self.callbackQueue, ^{
-             callback(nil, error);
+             callback(nil, nil, error);
          });
      }];
 }

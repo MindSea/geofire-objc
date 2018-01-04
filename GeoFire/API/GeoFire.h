@@ -37,7 +37,7 @@
 @class FIRDatabaseReference;
 
 typedef void (^GFCompletionBlock) (NSError *error);
-typedef void (^GFCallbackBlock) (CLLocation *location, NSError *error);
+typedef void (^GFCallbackBlock) (CLLocation *location, id customData, NSError *error);
 
 /**
  * A GeoFire instance is used to store geo location data at a Firebase location.
@@ -74,13 +74,25 @@ typedef void (^GFCallbackBlock) (CLLocation *location, NSError *error);
              forKey:(NSString *)key;
 
 /**
- * Updates the location for a key and calls the completion callback once the location was successfully updated on the
- * server.
+ * Updates the location for a key, clears any custom data, and calls the completion callback once the location was successfully updated on the server.
  * @param location The location as a geographic coordinate
  * @param key The key for which this location is saved
  * @param block The completion block that is called once the location was successfully updated on the server
  */
 - (void)setLocation:(CLLocation *)location
+             forKey:(NSString *)key
+withCompletionBlock:(GFCompletionBlock)block;
+
+/**
+ * Updates the location and custom data for a key and calls the completion callback once the location was successfully updated on the
+ * server.
+ * @param location The location as a geographic coordinate
+ * @param customData The optional custom data to store alongside the location.
+ * @param key The key for which this location is saved
+ * @param block The completion block that is called once the location was successfully updated on the server
+ */
+- (void)setLocation:(CLLocation *)location
+         customData:(id)customData
              forKey:(NSString *)key
 withCompletionBlock:(GFCompletionBlock)block;
 
@@ -99,9 +111,7 @@ withCompletionBlock:(GFCompletionBlock)block;
 - (void)removeKey:(NSString *)key withCompletionBlock:(GFCompletionBlock)block;
 
 /**
- * Gets the current location for a key in GeoFire and calls the callback with the location or nil if there is no
- * location for the key in GeoFire. If an error occurred, the callback will be called with the error and location
- * will be nil.
+ * Gets the current location and custom data for a key in GeoFire and calls the callback with the location and custom data or nil if there is no location for the key in GeoFire. If an error occurred, the callback will be called with the error and location and customData will be nil.
  *
  * @param key The key to observe the location for
  * @param callback The callback that is called for the current location
