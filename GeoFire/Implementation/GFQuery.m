@@ -206,6 +206,7 @@
 
 - (void)updateLocationInfo:(CLLocation *)location
                 customData:(id)customData
+  customDataMayHaveChanged:(BOOL)customDataMayHaveChanged
                     forKey:(NSString *)key
 {
     NSAssert(location != nil, @"Internal Error! Location must not be nil!");
@@ -241,7 +242,7 @@
                 block(key, info.location, info.customData);
             });
         }];
-    } else if (!isNew && info.isInQuery) {
+    } else if (!isNew && info.isInQuery && customDataMayHaveChanged) {
         [self.customDataMaybeChangedObservers enumerateKeysAndObjectsUsingBlock:^(id observerKey,
                                                                                   GFQueryResultBlock block,
                                                                                   BOOL *stop) {
@@ -276,7 +277,7 @@
         CLLocation *location = [GeoFire locationFromValue:snapshot.value];
         if (location != nil) {
             id customData = [GeoFire customDataFromSnapshot:snapshot];
-            [self updateLocationInfo:location customData:customData forKey:snapshot.key];
+            [self updateLocationInfo:location customData:customData customDataMayHaveChanged:NO forKey:snapshot.key];
         } else {
             // TODO: error?
         }
@@ -289,7 +290,7 @@
         CLLocation *location = [GeoFire locationFromValue:snapshot.value];
         if (location != nil) {
             id customData = [GeoFire customDataFromSnapshot:snapshot];
-            [self updateLocationInfo:location customData:customData forKey:snapshot.key];
+            [self updateLocationInfo:location customData:customData customDataMayHaveChanged:YES forKey:snapshot.key];
         } else {
             // TODO: error?
         }
@@ -405,7 +406,7 @@
     }];
     self.queries = newQueries;
     [self.locationInfos enumerateKeysAndObjectsUsingBlock:^(id key, GFQueryLocationInfo *info, BOOL *stop) {
-        [self updateLocationInfo:info.location customData:info.customData forKey:key];
+        [self updateLocationInfo:info.location customData:info.customData customDataMayHaveChanged:NO forKey:key];
     }];
     NSMutableArray *oldLocations = [NSMutableArray array];
     [self.locationInfos enumerateKeysAndObjectsUsingBlock:^(id key, GFQueryLocationInfo *info, BOOL *stop) {
