@@ -42,7 +42,7 @@ typedef NS_ENUM(NSUInteger, GFEventType) {
     GFEventTypeCustomDataMaybeChanged
 };
 
-typedef void (^GFQueryResultBlock) (NSString *key, CLLocation *location, id customData);
+typedef void (^GFQueryResultBlock) (NSString *key, CLLocation *location, id _Nullable customData);
 typedef void (^GFReadyBlock) (void);
 
 /**
