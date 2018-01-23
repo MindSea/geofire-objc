@@ -36,8 +36,10 @@
 
 @class FIRDatabaseReference;
 
-typedef void (^GFCompletionBlock) (NSError *error);
-typedef void (^GFCallbackBlock) (CLLocation *location, id customData, NSError *error);
+NS_ASSUME_NONNULL_BEGIN
+
+typedef void (^GFCompletionBlock) (NSError * _Nullable error);
+typedef void (^GFCallbackBlock) (CLLocation * _Nullable location, id _Nullable customData, NSError * _Nullable error);
 
 /**
  * A GeoFire instance is used to store geo location data at a Firebase location.
@@ -81,7 +83,7 @@ typedef void (^GFCallbackBlock) (CLLocation *location, id customData, NSError *e
  */
 - (void)setLocation:(CLLocation *)location
              forKey:(NSString *)key
-withCompletionBlock:(GFCompletionBlock)block;
+withCompletionBlock:(nullable GFCompletionBlock)block;
 
 /**
  * Updates the location and custom data for a key and calls the completion callback once the location was successfully updated on the
@@ -92,9 +94,9 @@ withCompletionBlock:(GFCompletionBlock)block;
  * @param block The completion block that is called once the location was successfully updated on the server
  */
 - (void)setLocation:(CLLocation *)location
-         customData:(id)customData
+         customData:(nullable id)customData
              forKey:(NSString *)key
-withCompletionBlock:(GFCompletionBlock)block;
+withCompletionBlock:(nullable GFCompletionBlock)block;
 
 /**
  * Removes the location for a given key.
@@ -108,7 +110,7 @@ withCompletionBlock:(GFCompletionBlock)block;
  * @param key The key for which the location is removed
  * @param block The completion block that is called once the location was successfully updated on the server
  */
-- (void)removeKey:(NSString *)key withCompletionBlock:(GFCompletionBlock)block;
+- (void)removeKey:(NSString *)key withCompletionBlock:(nullable GFCompletionBlock)block;
 
 /**
  * Gets the current location and custom data for a key in GeoFire and calls the callback with the location and custom data or nil if there is no location for the key in GeoFire. If an error occurred, the callback will be called with the error and location and customData will be nil.
@@ -138,3 +140,5 @@ withCompletionBlock:(GFCompletionBlock)block;
 - (GFRegionQuery *)queryWithRegion:(MKCoordinateRegion)region;
 
 @end
+
+NS_ASSUME_NONNULL_END
