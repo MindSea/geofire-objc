@@ -97,7 +97,6 @@ withCompletionBlock:(GFCompletionBlock)block
                withBlock:(GFCompletionBlock)block
 {
     NSMutableDictionary *value;
-    NSString *priority;
     if (location != nil) {
         NSNumber *lat = [NSNumber numberWithDouble:location.coordinate.latitude];
         NSNumber *lng = [NSNumber numberWithDouble:location.coordinate.longitude];
@@ -108,20 +107,26 @@ withCompletionBlock:(GFCompletionBlock)block
         if (customData && ![[NSNull null] isEqual:customData]) {
             value[MSDCustomDataKey] = customData;
         }
-        priority = geoHash;
+
+        [[self firebaseRefForLocationKey:key] updateChildValues:value
+                                            withCompletionBlock:^(NSError *error, FIRDatabaseReference *ref) {
+            if (block != nil) {
+                dispatch_async(self.callbackQueue, ^{
+                    block(error);
+                });
+            }
+        }];
     } else {
-        value = nil;
-        priority = nil;
+        [[self firebaseRefForLocationKey:key] removeValueWithCompletionBlock:^(NSError *error,
+                                                                               FIRDatabaseReference *ref) {
+            if (block != nil) {
+                dispatch_async(self.callbackQueue, ^{
+                    block(error);
+                });
+            }
+        }];
     }
-    [[self firebaseRefForLocationKey:key] setValue:value
-                                       andPriority:priority
-                               withCompletionBlock:^(NSError *error, FIRDatabaseReference *ref) {
-        if (block != nil) {
-            dispatch_async(self.callbackQueue, ^{
-                block(error);
-            });
-        }
-    }];
+
 }
 
 - (void)removeKey:(NSString *)key

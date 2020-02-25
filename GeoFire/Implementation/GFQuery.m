@@ -22,6 +22,7 @@
 @property (nonatomic, strong) CLLocation *location;
 @property (nonatomic, strong) GFGeoHash *geoHash;
 @property (nonatomic, strong) id customData;
+@property (nonatomic, strong) FIRDataSnapshot *snapshot;
 
 @end
 
@@ -180,6 +181,16 @@
 @property (nonatomic, strong) NSMutableDictionary *keyExitedObservers;
 @property (nonatomic, strong) NSMutableDictionary *keyMovedObservers;
 @property (nonatomic, strong) NSMutableDictionary *customDataMaybeChangedObservers;
+
+/**
+ * The group of snapshot observers initialized by calling
+ * @see GFQuery::observeEventType:withSnapshotBlock:
+ * Useful when you are storing model data and geo data in the same database location.
+ */
+@property (nonatomic, strong) NSMutableDictionary *keyEnteredSnapshotObservers;
+@property (nonatomic, strong) NSMutableDictionary *keyExitedSnapshotObservers;
+@property (nonatomic, strong) NSMutableDictionary *keyMovedSnapshotObservers;
+
 @property (nonatomic, strong) NSMutableDictionary *readyObservers;
 @property (nonatomic) NSUInteger currentHandle;
 
@@ -208,6 +219,7 @@
                 customData:(id)customData
   customDataMayHaveChanged:(BOOL)customDataMayHaveChanged
                     forKey:(NSString *)key
+                  snapshot:(FIRDataSnapshot *)snapshot
 {
     NSAssert(location != nil, @"Internal Error! Location must not be nil!");
     GFQueryLocationInfo *info = self.locationInfos[key];
@@ -225,6 +237,7 @@
     info.isInQuery = [self locationIsInQuery:location];
     info.geoHash = [GFGeoHash newWithLocation:location.coordinate];
     info.customData = [[NSNull null] isEqual:customData] ? nil : customData;
+    info.snapshot = snapshot;
 
     if ((isNew || !wasInQuery) && info.isInQuery) {
         [self.keyEnteredObservers enumerateKeysAndObjectsUsingBlock:^(id observerKey,
@@ -232,6 +245,13 @@
                                                                       BOOL *stop) {
             dispatch_async(self.geoFire.callbackQueue, ^{
                 block(key, info.location, info.customData);
+            });
+        }];
+        [self.keyEnteredSnapshotObservers enumerateKeysAndObjectsUsingBlock:^(id observerKey,
+                                                                                  GFQueryResultSnapshotBlock block,
+                                                                                  BOOL *stop) {
+            dispatch_async(self.geoFire.callbackQueue, ^{
+                block(key, info.snapshot);
             });
         }];
     } else if (!isNew && changedLocation && info.isInQuery) {
@@ -250,12 +270,26 @@
                 block(key, info.location, info.customData);
             });
         }];
+        [self.keyMovedSnapshotObservers enumerateKeysAndObjectsUsingBlock:^(id observerKey,
+                                                                                  GFQueryResultSnapshotBlock block,
+                                                                                  BOOL *stop) {
+            dispatch_async(self.geoFire.callbackQueue, ^{
+                block(key, info.snapshot);
+            });
+        }];
     } else if (wasInQuery && !info.isInQuery) {
         [self.keyExitedObservers enumerateKeysAndObjectsUsingBlock:^(id observerKey,
                                                                      GFQueryResultBlock block,
                                                                      BOOL *stop) {
             dispatch_async(self.geoFire.callbackQueue, ^{
                 block(key, info.location, info.customData);
+            });
+        }];
+        [self.keyExitedSnapshotObservers enumerateKeysAndObjectsUsingBlock:^(id observerKey,
+                                                                                  GFQueryResultSnapshotBlock block,
+                                                                                  BOOL *stop) {
+            dispatch_async(self.geoFire.callbackQueue, ^{
+                block(key, info.snapshot);
             });
         }];
     }
@@ -277,7 +311,7 @@
         CLLocation *location = [GeoFire locationFromValue:snapshot.value];
         if (location != nil) {
             id customData = [GeoFire customDataFromSnapshot:snapshot];
-            [self updateLocationInfo:location customData:customData customDataMayHaveChanged:NO forKey:snapshot.key];
+            [self updateLocationInfo:location customData:customData customDataMayHaveChanged:NO forKey:snapshot.key snapshot:snapshot];
         } else {
             // TODO: error?
         }
@@ -290,7 +324,7 @@
         CLLocation *location = [GeoFire locationFromValue:snapshot.value];
         if (location != nil) {
             id customData = [GeoFire customDataFromSnapshot:snapshot];
-            [self updateLocationInfo:location customData:customData customDataMayHaveChanged:YES forKey:snapshot.key];
+            [self updateLocationInfo:location customData:customData customDataMayHaveChanged:YES forKey:snapshot.key snapshot:snapshot];
         } else {
             // TODO: error?
         }
@@ -320,6 +354,13 @@
                                                                                          BOOL *stop) {
                                 dispatch_async(self.geoFire.callbackQueue, ^{
                                     block(key, location, info.customData);
+                                });
+                            }];
+                            [self.keyExitedSnapshotObservers enumerateKeysAndObjectsUsingBlock:^(id observerKey,
+                                                                                                     GFQueryResultSnapshotBlock block,
+                                                                                                     BOOL *stop) {
+                                dispatch_async(self.geoFire.callbackQueue, ^{
+                                    block(key, snapshot);
                                 });
                             }];
                         }
@@ -406,7 +447,7 @@
     }];
     self.queries = newQueries;
     [self.locationInfos enumerateKeysAndObjectsUsingBlock:^(id key, GFQueryLocationInfo *info, BOOL *stop) {
-        [self updateLocationInfo:info.location customData:info.customData customDataMayHaveChanged:NO forKey:key];
+        [self updateLocationInfo:info.location customData:info.customData customDataMayHaveChanged:NO forKey:key snapshot:info.snapshot];
     }];
     NSMutableArray *oldLocations = [NSMutableArray array];
     [self.locationInfos enumerateKeysAndObjectsUsingBlock:^(id key, GFQueryLocationInfo *info, BOOL *stop) {
@@ -439,6 +480,9 @@
     self.keyExitedObservers = [NSMutableDictionary dictionary];
     self.keyMovedObservers = [NSMutableDictionary dictionary];
     self.customDataMaybeChangedObservers = [NSMutableDictionary dictionary];
+    self.keyEnteredSnapshotObservers = [NSMutableDictionary dictionary];
+    self.keyExitedSnapshotObservers = [NSMutableDictionary dictionary];
+    self.keyMovedSnapshotObservers = [NSMutableDictionary dictionary];
     self.readyObservers = [NSMutableDictionary dictionary];
     self.locationInfos = [NSMutableDictionary dictionary];
 }
@@ -458,6 +502,9 @@
         [self.keyExitedObservers removeObjectForKey:handle];
         [self.keyMovedObservers removeObjectForKey:handle];
         [self.customDataMaybeChangedObservers removeObjectForKey:handle];
+        [self.keyEnteredSnapshotObservers removeObjectForKey:handle];
+        [self.keyExitedSnapshotObservers removeObjectForKey:handle];
+        [self.keyMovedSnapshotObservers removeObjectForKey:handle];
         [self.readyObservers removeObjectForKey:handle];
         if ([self totalObserverCount] == 0) {
             [self reset];
@@ -467,7 +514,10 @@
 
 - (NSUInteger)totalObserverCount
 {
-    return (self.keyEnteredObservers.count +
+    return (self.keyEnteredSnapshotObservers.count +
+            self.keyExitedSnapshotObservers.count +
+            self.keyMovedSnapshotObservers.count +
+            self.keyEnteredObservers.count +
             self.keyExitedObservers.count +
             self.keyMovedObservers.count +
             self.customDataMaybeChangedObservers.count +
@@ -515,6 +565,56 @@
             case GFEventTypeCustomDataMaybeChanged: {
                 [self.customDataMaybeChangedObservers setObject:[block copy]
                                                          forKey:numberHandle];
+                self.currentHandle++;
+                break;
+            }
+            default: {
+                [NSException raise:NSInvalidArgumentException format:@"Event type was not a GFEventType!"];
+                break;
+            }
+        }
+        if (self.queries == nil) {
+            [self updateQueries];
+        }
+        return firebaseHandle;
+    }
+}
+
+- (FirebaseHandle)observeEventType:(GFEventType)eventType withSnapshotBlock:(GFQueryResultSnapshotBlock)block
+{
+    @synchronized(self) {
+        if (block == nil) {
+            [NSException raise:NSInvalidArgumentException format:@"Block is not allowed to be nil!"];
+        }
+        FirebaseHandle firebaseHandle = self.currentHandle++;
+        NSNumber *numberHandle = [NSNumber numberWithUnsignedInteger:firebaseHandle];
+        switch (eventType) {
+            case GFEventTypeKeyEntered: {
+                [self.keyEnteredSnapshotObservers setObject:[block copy]
+                                                         forKey:numberHandle];
+                self.currentHandle++;
+                dispatch_async(self.geoFire.callbackQueue, ^{
+                    @synchronized(self) {
+                        [self.locationInfos enumerateKeysAndObjectsUsingBlock:^(NSString *key,
+                                                                                GFQueryLocationInfo *info,
+                                                                                BOOL *stop) {
+                            if (info.isInQuery) {
+                                block(key, info.snapshot);
+                            }
+                        }];
+                    };
+                });
+                break;
+            }
+            case GFEventTypeKeyExited: {
+                [self.keyExitedSnapshotObservers setObject:[block copy]
+                                                        forKey:numberHandle];
+                self.currentHandle++;
+                break;
+            }
+            case GFEventTypeKeyMoved: {
+                [self.keyMovedSnapshotObservers setObject:[block copy]
+                                                       forKey:numberHandle];
                 self.currentHandle++;
                 break;
             }
